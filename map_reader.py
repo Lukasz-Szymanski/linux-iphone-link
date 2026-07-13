@@ -59,8 +59,21 @@ async def main():
         
         console.print("\n[bold magenta]--- Skrzynka odbiorcza (Ostatnie 10 wiadomości) ---[/]\n")
         
-        # Wiadomości zwracane są jako słownik (dict: ścieżka -> właściwości), używamy .items()
-        for msg_path, msg_props in messages.items():
+        # Debugging the structure
+        console.print(f"[dim]Debug: typ wiadomości = {type(messages)}[/dim]")
+        
+        for msg in messages:
+            if isinstance(msg, dict):
+                # if it's a dict, maybe we're iterating keys?
+                pass
+            
+            # The structure is usually [object_path, properties_dict]
+            if len(msg) >= 2:
+                msg_path = msg[0]
+                msg_props = msg[1]
+            else:
+                msg_props = msg
+                
             subject = msg_props.get('Subject', Variant('s', '<Brak treści/Szyfrowane>')).value
             sender = msg_props.get('Sender', Variant('s', '<Nieznany>')).value
             sender_name = msg_props.get('SenderName', Variant('s', '')).value
