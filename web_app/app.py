@@ -60,5 +60,60 @@ async def list_messages():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+import os
+import tempfile
+
+@app.route('/api/send', methods=['POST'])
+async def send_message():
+    data = request.json
+    number = data.get('number')
+    text = data.get('text')
+    
+    if not number or not text:
+        return jsonify({"error": "Brak numeru lub treści"}), 400
+        
+    map_iface, _ = await get_map_session()
+    if not map_iface:
+        return jsonify({"error": "Brak sesji MAP"}), 500
+        
+    # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
+    bmsg_content = f"""BEGIN:BMSG
+VERSION:1.0
+STATUS:UNREAD
+TYPE:SMS_GSM
+FOLDER:telecom/msg/outbox
+BEGIN:BENV
+BEGIN:VCARD
+VERSION:3.0
+N:;{number};;;
+TEL:{number}
+END:VCARD
+BEGIN:BBODY
+ENCODING:8BIT
+LENGTH:{len(text.encode('utf-8'))}
+BEGIN:MSG
+{text}
+END:MSG
+END:BBODY
+END:BENV
+END:BMSG"""
+
+    fd, path = tempfile.mkstemp(suffix=".bmsg")
+    with os.fdopen(fd, 'w') as f:
+        f.write(bmsg_content)
+        
+    try:
+        # Przekazujemy plik do demona obexd
+        transfer = await map_iface.call_push_message(path, {})
+        return jsonify({"success": True, "transfer": str(transfer)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Usuwamy plik tymczasowy po wysłaniu
+        try:
+            os.remove(path)
+        except:
+            pass
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

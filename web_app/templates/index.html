@@ -42,6 +42,8 @@
     </div>
 
     <script>
+        let currentActiveNumber = null;
+        
         async function fetchMessages() {
             try {
                 const response = await fetch('/api/messages');
@@ -65,18 +67,19 @@
                     item.style.animation = 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards';
                     item.style.opacity = '0';
                     
-                    const sender = msg.sender_name || msg.sender;
+                    const senderDisplay = msg.sender_name || msg.sender;
                     const date = msg.timestamp ? msg.timestamp.substring(4, 16) : '';
                     
                     item.innerHTML = `
                         <div class="message-header">
-                            <span class="message-sender">${sender}</span>
+                            <span class="message-sender">${senderDisplay}</span>
                             <span class="message-time">${date}</span>
                         </div>
                         <div class="message-subject">${msg.subject}</div>
                     `;
                     
-                    item.onclick = () => selectConversation(sender, msg.subject);
+                    // We need the raw number to reply to!
+                    item.onclick = () => selectConversation(senderDisplay, msg.sender, msg.subject);
                     inboxList.appendChild(item);
                 });
                 
@@ -85,7 +88,8 @@
             }
         }
         
-        function selectConversation(sender, subject) {
+        function selectConversation(senderDisplay, rawNumber, subject) {
+            currentActiveNumber = rawNumber;
             const chatHistory = document.getElementById('chatHistory');
             chatHistory.innerHTML = '';
             
@@ -97,10 +101,13 @@
             
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
+            document.getElementById('messageInput').placeholder = `Odpisz do ${senderDisplay}...`;
             document.getElementById('messageInput').focus();
         }
         
-        function sendMessage() {
+        async function sendMessage() {
+            if (!currentActiveNumber) return;
+            
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
             if (!text) return;
@@ -113,19 +120,36 @@
             chatHistory.appendChild(bubble);
             
             input.value = '';
+            input.disabled = true;
+            document.getElementById('sendBtn').disabled = true;
             
-            // TODO: Wywołanie API backendowego do metody PushMessage w OBEX MAP
-            // UWAGA: Apple często blokuje PushMessage jeśli host nie udaje zestawu głośnomówiącego Audio!
-            
-            setTimeout(() => {
-                const errorBubble = document.createElement('div');
-                errorBubble.className = 'chat-bubble received';
-                errorBubble.style.background = 'rgba(244, 63, 94, 0.1)';
-                errorBubble.style.color = 'var(--accent-warm)';
-                errorBubble.innerText = "System iOS zablokował wychodzącą wiadomość (brak profilu głośnomówiącego Audio). Funkcja odczytu działa poprawnie.";
-                chatHistory.appendChild(errorBubble);
-                chatHistory.scrollTop = chatHistory.scrollHeight;
-            }, 1000);
+            // Call Backend
+            try {
+                const response = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number: currentActiveNumber, text: text })
+                });
+                
+                const result = await response.json();
+                
+                input.disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                input.focus();
+                
+                if (result.error) {
+                    const errorBubble = document.createElement('div');
+                    errorBubble.className = 'chat-bubble received';
+                    errorBubble.style.background = 'rgba(244, 63, 94, 0.1)';
+                    errorBubble.style.color = 'var(--accent-warm)';
+                    errorBubble.innerText = `Błąd wysyłania: ${result.error}`;
+                    chatHistory.appendChild(errorBubble);
+                }
+            } catch (err) {
+                input.disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                console.error(err);
+            }
             
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
