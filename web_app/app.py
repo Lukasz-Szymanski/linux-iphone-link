@@ -129,8 +129,8 @@ END:BMSG"""
         f.write(bmsg_content)
         
     try:
-        # Przekazujemy plik do demona obexd
-        transfer = await map_iface.call_push_message(path, {})
+        # Przekazujemy plik do demona obexd (3 argumenty: plik, folder_docelowy, opcje)
+        transfer = await map_iface.call_push_message(path, "", {})
         return jsonify({"success": True, "transfer": str(transfer)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
