@@ -103,7 +103,8 @@ async def connect_and_listen(mac_address: str | None) -> None:
         console.print(f"[bold blue]🔄 Attempting to connect to {address_to_print}...[/]")
 
         try:
-            async with BleakClient(device) as client:
+            # iOS BLE connections can sometimes take longer than the default timeout
+            async with BleakClient(device, timeout=20.0) as client:
                 console.print(f"[bold green]✔[/] Connected to [bold]{address_to_print}[/]")
                 
                 # Verify ANCS service is present
@@ -140,7 +141,9 @@ async def connect_and_listen(mac_address: str | None) -> None:
             console.print("[dim]Retrying in 5 seconds...[/]")
             await asyncio.sleep(5)
         except Exception as e:
-            console.print(f"[bold red]✘[/] Unexpected Error: {e}")
+            import traceback
+            console.print(f"[bold red]✘[/] Unexpected Error: {repr(e)}")
+            console.print(f"[dim]{traceback.format_exc()}[/]")
             console.print("[dim]Retrying in 5 seconds...[/]")
             await asyncio.sleep(5)
 
