@@ -129,8 +129,24 @@ END:BMSG"""
         f.write(bmsg_content)
         
     try:
-        # Przekazujemy plik do demona obexd (3 argumenty: plik, folder_docelowy, opcje)
-        transfer = await map_iface.call_push_message(path, "", {})
+        # Pchamy wiadomość używając czystego zapytania D-Bus z poprawną sygnaturą sa{sv}, 
+        # omijając wadliwą introspekcję BlueZ.
+        from dbus_next import Message, MessageType
+        
+        msg = Message(destination='org.bluez.obex',
+                      path=session_path,
+                      interface='org.bluez.obex.MessageAccess1',
+                      member='PushMessage',
+                      signature='sa{sv}',
+                      body=[path, {}])
+                      
+        bus = map_iface.bus
+        reply = await bus.call(msg)
+        
+        if reply.message_type == MessageType.ERROR:
+            return jsonify({"error": f"BlueZ: {reply.error_name} - {reply.body}"}), 500
+            
+        transfer = reply.body[0] if reply.body else "unknown"
         return jsonify({"success": True, "transfer": str(transfer)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
