@@ -114,25 +114,27 @@ async def send_message():
         return jsonify({"error": f"Błąd inicjalizacji DBus: {str(e)}"}), 500
         
     # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
-    bmsg_content = f"""BEGIN:BMSG
-VERSION:1.0
-STATUS:UNREAD
-TYPE:SMS_GSM
-FOLDER:telecom/msg/outbox
-BEGIN:BENV
-BEGIN:VCARD
-VERSION:2.1
-TEL:{number}
-END:VCARD
-BEGIN:BBODY
-CHARSET:UTF-8
-LENGTH:{len(text.encode('utf-8'))}
-BEGIN:MSG
-{text}
-END:MSG
-END:BBODY
-END:BENV
-END:BMSG"""
+    # Zgodnie ze specyfikacją MAP musi zawierać zakończenia linii \r\n
+    msg_part = f"BEGIN:MSG\r\n{text}\r\nEND:MSG\r\n"
+    msg_length = len(msg_part.encode('utf-8'))
+    
+    bmsg_content = f"BEGIN:BMSG\r\n" \
+                   f"VERSION:1.0\r\n" \
+                   f"STATUS:UNREAD\r\n" \
+                   f"TYPE:SMS_GSM\r\n" \
+                   f"FOLDER:telecom/msg/outbox\r\n" \
+                   f"BEGIN:BENV\r\n" \
+                   f"BEGIN:VCARD\r\n" \
+                   f"VERSION:2.1\r\n" \
+                   f"TEL:{number}\r\n" \
+                   f"END:VCARD\r\n" \
+                   f"BEGIN:BBODY\r\n" \
+                   f"CHARSET:UTF-8\r\n" \
+                   f"LENGTH:{msg_length}\r\n" \
+                   f"{msg_part}" \
+                   f"END:BBODY\r\n" \
+                   f"END:BENV\r\n" \
+                   f"END:BMSG\r\n"
     
     fd, path = tempfile.mkstemp(suffix=".bmsg")
     with os.fdopen(fd, 'w', encoding='utf-8') as f:
