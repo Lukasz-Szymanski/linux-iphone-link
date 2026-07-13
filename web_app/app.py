@@ -53,12 +53,50 @@ async def get_map_session():
         return None, None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
         
     try:
-        session_intro = await bus.introspect('org.bluez.obex', session_path)
+        # Ręcznie pobieramy XML, by go w razie potrzeby naprawić
+        from dbus_next import Message, introspection
+        
+        reply = await bus.call(Message(
+            destination='org.bluez.obex',
+            path=session_path,
+            interface='org.freedesktop.DBus.Introspectable',
+            member='Introspect'
+        ))
+        
+        xml = reply.body[0]
+        
+        # Obejście błędu BlueZ (obexd), który potrafi "zapomnieć" wyeksportować interfejs MAP w XMLu
+        if 'org.bluez.obex.MessageAccess1' not in xml:
+            xml = xml.replace('</node>', '''
+  <interface name="org.bluez.obex.MessageAccess1">
+    <method name="SetFolder">
+      <arg name="name" type="s" direction="in"/>
+    </method>
+    <method name="ListFolders">
+      <arg name="filters" type="a{sv}" direction="in"/>
+      <arg name="content" type="aa{sv}" direction="out"/>
+    </method>
+    <method name="ListMessages">
+      <arg name="folder" type="s" direction="in"/>
+      <arg name="filter" type="a{sv}" direction="in"/>
+      <arg name="messages" type="a{oa{sv}}" direction="out"/>
+    </method>
+    <method name="UpdateInbox"></method>
+    <method name="PushMessage">
+      <arg name="file" type="s" direction="in"/>
+      <arg name="folder" type="s" direction="in"/>
+      <arg name="args" type="a{sv}" direction="in"/>
+      <arg name="transfer" type="o" direction="out"/>
+      <arg name="properties" type="a{sv}" direction="out"/>
+    </method>
+  </interface>
+</node>''')
+            
+        session_intro = introspection.Node.parse(xml)
         session_proxy = bus.get_proxy_object('org.bluez.obex', session_path, session_intro)
         map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
         return bus, map_iface, session_path, None
     except Exception as e:
-        # Introspekcja zawiodła, ale sesja istnieje. Zwracamy bus by wykonać raw call.
         return bus, None, session_path, None
 
 @app.route('/')
