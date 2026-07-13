@@ -120,8 +120,9 @@ async def connect_and_listen(mac_address: str | None) -> None:
                 # After pairing, iOS might take a few seconds to expose ANCS in the GATT table. We loop and wait.
                 ancs_service = None
                 for attempt in range(10):
-                    services = await client.get_services()
-                    ancs_service = services.get_service(ANCS_SERVICE_UUID)
+                    # In newer bleak, services are auto-updated by DBus signals after pairing.
+                    services = client.services
+                    ancs_service = services.get_service(ANCS_SERVICE_UUID) if services else None
                     if ancs_service:
                         break
                     console.print(f"[dim]Waiting for ANCS service to appear in GATT table (attempt {attempt+1}/10)...[/]")
