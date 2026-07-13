@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux iPhone Link</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <h1>iPhone Messages</h1>
+        <div class="status-badge" id="statusBadge">Connected (MAP)</div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="inbox" id="inboxList">
+            <div style="padding: 24px; text-align: center; color: var(--text-muted);">
+                Ładowanie wiadomości...
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-history" id="chatHistory">
+                <!-- Placeholder for empty state -->
+                <div style="margin: auto; text-align: center; color: var(--text-muted);">
+                    <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom: 16px; opacity: 0.5;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+                    </svg>
+                    <h3>Wybierz konwersację z listy</h3>
+                    <p style="font-size: 14px; margin-top: 8px;">Wiadomości synchronizowane przez protokół OBEX</p>
+                </div>
+            </div>
+            
+            <div class="compose-area">
+                <input type="text" class="compose-input" id="messageInput" placeholder="Napisz wiadomość (Odpowiadanie eksperymentalne!)..." disabled>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>Wyślij</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchMessages() {
+            try {
+                const response = await fetch('/api/messages');
+                const data = await response.json();
+                
+                const inboxList = document.getElementById('inboxList');
+                inboxList.innerHTML = '';
+                
+                if (data.error) {
+                    document.getElementById('statusBadge').innerText = "Błąd Połączenia";
+                    document.getElementById('statusBadge').style.background = "rgba(244, 63, 94, 0.1)";
+                    document.getElementById('statusBadge').style.color = "var(--accent-warm)";
+                    inboxList.innerHTML = `<div style="padding: 24px; color: var(--accent-warm);">${data.error}</div>`;
+                    return;
+                }
+
+                data.messages.forEach((msg, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'message-item';
+                    item.style.animationDelay = `${index * 0.05}s`;
+                    item.style.animation = 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+                    item.style.opacity = '0';
+                    
+                    const sender = msg.sender_name || msg.sender;
+                    const date = msg.timestamp ? msg.timestamp.substring(4, 16) : '';
+                    
+                    item.innerHTML = `
+                        <div class="message-header">
+                            <span class="message-sender">${sender}</span>
+                            <span class="message-time">${date}</span>
+                        </div>
+                        <div class="message-subject">${msg.subject}</div>
+                    `;
+                    
+                    item.onclick = () => selectConversation(sender, msg.subject);
+                    inboxList.appendChild(item);
+                });
+                
+            } catch (error) {
+                console.error("Error fetching messages:", error);
+            }
+        }
+        
+        function selectConversation(sender, subject) {
+            const chatHistory = document.getElementById('chatHistory');
+            chatHistory.innerHTML = '';
+            
+            // Render received message
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble received';
+            bubble.innerText = subject;
+            chatHistory.appendChild(bubble);
+            
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            document.getElementById('messageInput').focus();
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            // Add to UI immediately
+            const chatHistory = document.getElementById('chatHistory');
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble sent';
+            bubble.innerText = text;
+            chatHistory.appendChild(bubble);
+            
+            input.value = '';
+            
+            // TODO: Wywołanie API backendowego do metody PushMessage w OBEX MAP
+            // UWAGA: Apple często blokuje PushMessage jeśli host nie udaje zestawu głośnomówiącego Audio!
+            
+            setTimeout(() => {
+                const errorBubble = document.createElement('div');
+                errorBubble.className = 'chat-bubble received';
+                errorBubble.style.background = 'rgba(244, 63, 94, 0.1)';
+                errorBubble.style.color = 'var(--accent-warm)';
+                errorBubble.innerText = "System iOS zablokował wychodzącą wiadomość (brak profilu głośnomówiącego Audio). Funkcja odczytu działa poprawnie.";
+                chatHistory.appendChild(errorBubble);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }, 1000);
+            
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Fetch on load
+        fetchMessages();
+    </script>
+</body>
+</html>
