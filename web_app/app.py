@@ -18,7 +18,7 @@ async def get_map_session():
     session_path = None
     
     for path, interfaces in managed_objects.items():
-        if 'org.bluez.obex.Session1' in interfaces:
+        if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
             props = interfaces['org.bluez.obex.Session1']
             dest = props.get('Destination', Variant('s', '')).value
             if dest.upper() == MAC_ADDRESS.upper():
@@ -38,7 +38,7 @@ async def get_map_session():
             last_error = str(e)
             managed_objects = await obj_manager.call_get_managed_objects()
             for path, interfaces in managed_objects.items():
-                if 'org.bluez.obex.Session1' in interfaces:
+                if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
                     props = interfaces['org.bluez.obex.Session1']
                     dest = props.get('Destination', Variant('s', '')).value
                     if dest.upper() == MAC_ADDRESS.upper():
