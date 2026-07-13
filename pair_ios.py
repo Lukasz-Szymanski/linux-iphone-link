@@ -12,16 +12,19 @@ async def pair_ios():
     
     devices_dict = await BleakScanner.discover(timeout=5.0, return_adv=True)
     
-    target_mac = None
+    apple_devices = []
     for address, (d, adv) in devices_dict.items():
         manufacturer_data = adv.manufacturer_data or {}
         if 76 in manufacturer_data:
-            target_mac = address
-            break
+            apple_devices.append((address, adv.rssi))
             
-    if not target_mac:
+    if not apple_devices:
         console.print("[bold red]✘ No iPhone found in BLE range![/]")
         return
+        
+    # Sort by RSSI (signal strength) descending to pick the closest phone!
+    apple_devices.sort(key=lambda x: x[1], reverse=True)
+    target_mac = apple_devices[0][0]
         
     console.print(f"\n[bold green]✔ Found iPhone with BLE MAC:[/] [bold]{target_mac}[/]")
     console.print("[yellow]Initiating pairing through bluetoothctl...[/]")
