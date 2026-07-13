@@ -107,6 +107,13 @@ async def connect_and_listen(mac_address: str | None) -> None:
             async with BleakClient(device, timeout=20.0) as client:
                 console.print(f"[bold green]✔[/] Connected to [bold]{address_to_print}[/]")
                 
+                # Force BLE pairing to trigger the iOS "Share Notifications" prompt
+                try:
+                    console.print("[dim]Requesting BLE pairing (check your iPhone screen)...[/]")
+                    await client.pair()
+                except Exception as e:
+                    console.print(f"[dim]Pairing request info: {e}[/]")
+                
                 # Verify ANCS service is present
                 services = client.services
                 ancs_service = services.get_service(ANCS_SERVICE_UUID)
