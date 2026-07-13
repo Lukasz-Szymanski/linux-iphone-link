@@ -37,16 +37,16 @@ async def main():
         console.print(f"Szczegóły błędu: {e}")
         return
         
-    # 3. Dostęp do interfejsu wiadomości
+        # 3. Dostęp do interfejsu wiadomości
     try:
         session_intro = await bus.introspect('org.bluez.obex', session_path)
         session_proxy = bus.get_proxy_object('org.bluez.obex', session_path, session_intro)
         
-        if 'org.bluez.obex.MessageAccess1' not in session_proxy.interfaces:
+        try:
+            map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
+        except Exception:
             console.print("[red]✘ Urządzenie nie obsługuje (lub nie udostępniło) profilu MAP.[/]")
             return
-            
-        map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
         
         console.print("[yellow]Pobieranie wiadomości...[/]")
         
