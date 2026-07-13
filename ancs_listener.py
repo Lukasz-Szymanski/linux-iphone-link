@@ -66,18 +66,17 @@ def notification_handler(sender: BleakGATTCharacteristic, data: bytearray) -> No
 async def find_apple_device() -> BLEDevice | None:
     """Scan and find a BLE device advertising the ANCS service or Apple Manufacturer Data."""
     console.print("[dim]Scanning for ANCS-compatible iOS devices...[/]")
-    devices = await BleakScanner.discover(timeout=5.0)
+    # return_adv=True returns a dict: address -> (BLEDevice, AdvertisementData)
+    devices_dict = await BleakScanner.discover(timeout=5.0, return_adv=True)
     
-    for d in devices:
-        if not d.metadata:
-            continue
-            
+    for address, (d, adv) in devices_dict.items():
         # Check if ANCS UUID is in advertised services
-        if ANCS_SERVICE_UUID in d.metadata.get("uuids", []):
+        uuids = adv.service_uuids or []
+        if ANCS_SERVICE_UUID in [str(u).lower() for u in uuids]:
             return d
         
         # Check Manufacturer data for Apple (0x004C / 76)
-        manufacturer_data = d.metadata.get("manufacturer_data", {})
+        manufacturer_data = adv.manufacturer_data or {}
         if 76 in manufacturer_data:
             return d
 
