@@ -15,21 +15,37 @@
 
     <div class="container">
         <!-- Sidebar -->
-        <div class="inbox" id="inboxList">
-            <div style="padding: 24px; text-align: center; color: var(--text-muted);">
-                Ładowanie wiadomości...
+        <div class="inbox-container" style="width: 350px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg-secondary);">
+            <div style="padding: 16px; border-bottom: 1px solid var(--border);">
+                <button class="send-btn" style="width: 100%; padding: 12px; display: flex; justify-content: center; gap: 8px;" onclick="startNewMessage()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Nowa wiadomość
+                </button>
+            </div>
+            <div class="inbox" id="inboxList" style="flex: 1; border-right: none; width: 100%;">
+                <div style="padding: 24px; text-align: center; color: var(--text-muted);">
+                    Ładowanie wiadomości...
+                </div>
             </div>
         </div>
 
         <!-- Chat Area -->
         <div class="chat-area">
+            <!-- New Message Header (Hidden by default) -->
+            <div id="newMsgHeader" style="display: none; padding: 16px 24px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); align-items: center; gap: 12px;">
+                <span style="font-weight: 600; color: var(--text-muted);">Do:</span>
+                <input type="text" id="newMsgNumber" class="compose-input" placeholder="Wpisz numer telefonu (np. +48...)" style="flex: 1; padding: 8px 12px;">
+            </div>
+
             <div class="chat-history" id="chatHistory">
                 <!-- Placeholder for empty state -->
                 <div style="margin: auto; text-align: center; color: var(--text-muted);">
                     <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom: 16px; opacity: 0.5;">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
                     </svg>
-                    <h3>Wybierz konwersację z listy</h3>
+                    <h3>Wybierz konwersację z listy lub zacznij nową</h3>
                     <p style="font-size: 14px; margin-top: 8px;">Wiadomości synchronizowane przez protokół OBEX</p>
                 </div>
             </div>
@@ -90,6 +106,7 @@
         
         function selectConversation(senderDisplay, rawNumber, subject) {
             currentActiveNumber = rawNumber;
+            document.getElementById('newMsgHeader').style.display = 'none';
             const chatHistory = document.getElementById('chatHistory');
             chatHistory.innerHTML = '';
             
@@ -105,8 +122,33 @@
             document.getElementById('messageInput').focus();
         }
         
+        function startNewMessage() {
+            currentActiveNumber = null;
+            document.getElementById('newMsgHeader').style.display = 'flex';
+            document.getElementById('newMsgNumber').value = '';
+            
+            const chatHistory = document.getElementById('chatHistory');
+            chatHistory.innerHTML = '<div style="margin: auto; color: var(--text-muted);">Napisz pierwszą wiadomość poniżej.</div>';
+            
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            document.getElementById('messageInput').placeholder = "Wpisz wiadomość...";
+            document.getElementById('newMsgNumber').focus();
+        }
+        
         async function sendMessage() {
-            if (!currentActiveNumber) return;
+            let targetNumber = currentActiveNumber;
+            
+            // Check if we are in "New Message" mode
+            if (document.getElementById('newMsgHeader').style.display === 'flex') {
+                targetNumber = document.getElementById('newMsgNumber').value.trim();
+                if (!targetNumber) {
+                    alert("Wpisz numer telefonu odbiorcy!");
+                    return;
+                }
+            }
+            
+            if (!targetNumber) return;
             
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
@@ -114,6 +156,9 @@
             
             // Add to UI immediately
             const chatHistory = document.getElementById('chatHistory');
+            if (chatHistory.innerHTML.includes("Napisz pierwszą wiadomość")) {
+                chatHistory.innerHTML = ''; // Clear placeholder
+            }
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble sent';
             bubble.innerText = text;
@@ -128,7 +173,7 @@
                 const response = await fetch('/api/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ number: currentActiveNumber, text: text })
+                    body: JSON.stringify({ number: targetNumber, text: text })
                 });
                 
                 const result = await response.json();
@@ -144,6 +189,14 @@
                     errorBubble.style.color = 'var(--accent-warm)';
                     errorBubble.innerText = `Błąd wysyłania: ${result.error}`;
                     chatHistory.appendChild(errorBubble);
+                } else {
+                    // Success!
+                    if (document.getElementById('newMsgHeader').style.display === 'flex') {
+                        // Switch to conversation mode
+                        currentActiveNumber = targetNumber;
+                        document.getElementById('newMsgHeader').style.display = 'none';
+                        document.getElementById('messageInput').placeholder = `Odpisz do ${targetNumber}...`;
+                    }
                 }
             } catch (err) {
                 input.disabled = false;
