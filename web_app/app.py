@@ -141,23 +141,12 @@ async def send_message():
         f.write(bmsg_content)
         
     try:
-        from dbus_next import Message, MessageType
-        
-        # Tworzymy RAW Message zamiast polegać na map_iface.call_push_message
-        msg = Message(destination='org.bluez.obex',
-                      path=session_path,
-                      interface='org.bluez.obex.MessageAccess1',
-                      member='PushMessage',
-                      signature='ssa{sv}',
-                      body=[path, "", {}])
-                      
-        reply = await bus.call(msg)
-        
-        if reply.message_type == MessageType.ERROR:
-            return jsonify({"error": f"BlueZ Error: {reply.error_name} - {reply.body}"}), 500
-            
-        transfer = reply.body[0] if reply.body else "unknown"
-        return jsonify({"success": True, "transfer": str(transfer)})
+        if map_iface:
+            # Używamy wygenerowanego proxy z introspekcji (które samo dobiera poprawną sygnaturę)
+            transfer = await map_iface.call_push_message(path, "", {})
+            return jsonify({"success": True, "transfer": str(transfer)})
+        else:
+            return jsonify({"error": "Brak dostępu do interfejsu MAP (spróbuj odświeżyć połączenie w ustawieniach Bluetooth)"}), 500
     except Exception as e:
         return jsonify({"error": f"BlueZ Error: {str(e)}"}), 500
     finally:
