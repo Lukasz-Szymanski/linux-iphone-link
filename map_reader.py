@@ -62,18 +62,7 @@ async def main():
         # Debugging the structure
         console.print(f"[dim]Debug: typ wiadomości = {type(messages)}[/dim]")
         
-        for msg in messages:
-            if isinstance(msg, dict):
-                # if it's a dict, maybe we're iterating keys?
-                pass
-            
-            # The structure is usually [object_path, properties_dict]
-            if len(msg) >= 2:
-                msg_path = msg[0]
-                msg_props = msg[1]
-            else:
-                msg_props = msg
-                
+        for msg_path, msg_props in messages.items():
             subject = msg_props.get('Subject', Variant('s', '<Brak treści/Szyfrowane>')).value
             sender = msg_props.get('Sender', Variant('s', '<Nieznany>')).value
             sender_name = msg_props.get('SenderName', Variant('s', '')).value
