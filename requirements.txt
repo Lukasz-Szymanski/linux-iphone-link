@@ -1,0 +1,30 @@
+# ==============================================================================
+# Linux-iPhone-Link — Python Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt
+# Recommended: use a virtual environment (python3 -m venv .venv && source .venv/bin/activate)
+# ==============================================================================
+
+# --- BLE / ANCS Integration ---
+# Cross-platform BLE library that wraps BlueZ on Linux (DBUS backend).
+# Used for: Phase 2 (ANCS listener) and Phase 3 (ANCS parser).
+bleak>=0.22.0
+
+# --- D-Bus Communication (BlueZ & Desktop Notifications) ---
+# Modern asyncio-native D-Bus library. Used for: BlueZ adapter introspection,
+# MAP profile (Phase 4), and desktop notification dispatch (Phase 3).
+dbus-next>=0.2.3
+
+# --- Desktop Notifications Fallback (Phase 3) ---
+# Pure-Python wrapper around the freedesktop.org Notifications D-Bus spec.
+# Used as a convenience layer over dbus-next for sending system notifications.
+notify2>=0.3.1
+
+# --- Logging & CLI Utilities ---
+# Structured, colorized terminal logging.
+rich>=13.7.0
+
+# --- Development / Testing (not required for runtime) ---
+# Uncomment when running tests:
+# pytest>=8.2.0
+# pytest-asyncio>=0.23.0
