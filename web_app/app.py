@@ -50,15 +50,16 @@ async def get_map_session():
                     break
                             
     if not session_path:
-        return None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
+        return None, None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
         
     try:
         session_intro = await bus.introspect('org.bluez.obex', session_path)
         session_proxy = bus.get_proxy_object('org.bluez.obex', session_path, session_intro)
         map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
-        return map_iface, session_path, None
+        return bus, map_iface, session_path, None
     except Exception as e:
-        return None, None, f"Błąd interfejsu MAP: {e}"
+        # Introspekcja zawiodła, ale sesja istnieje. Zwracamy bus by wykonać raw call.
+        return bus, None, session_path, None
 
 @app.route('/')
 def index():
@@ -66,7 +67,7 @@ def index():
 
 @app.route('/api/messages')
 async def list_messages():
-    map_iface, _, err = await get_map_session()
+    bus, map_iface, _, err = await get_map_session()
     if not map_iface:
         return jsonify({"error": err or "Brak połączenia z iPhonem"}), 500
         
@@ -102,8 +103,8 @@ async def send_message():
     if not number or not text:
         return jsonify({"error": "Brak numeru lub treści"}), 400
         
-    map_iface, session_path, err = await get_map_session()
-    if not map_iface:
+    bus, map_iface, session_path, err = await get_map_session()
+    if not session_path:
         return jsonify({"error": err or "Brak sesji MAP"}), 500
         
     # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
@@ -114,12 +115,11 @@ TYPE:SMS_GSM
 FOLDER:telecom/msg/outbox
 BEGIN:BENV
 BEGIN:VCARD
-VERSION:3.0
-N:;{number};;;
+VERSION:2.1
 TEL:{number}
 END:VCARD
 BEGIN:BBODY
-ENCODING:8BIT
+CHARSET:UTF-8
 LENGTH:{len(text.encode('utf-8'))}
 BEGIN:MSG
 {text}
@@ -127,14 +127,28 @@ END:MSG
 END:BBODY
 END:BENV
 END:BMSG"""
-
+    
     fd, path = tempfile.mkstemp(suffix=".bmsg")
-    with os.fdopen(fd, 'w') as f:
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
         f.write(bmsg_content)
         
     try:
-        # Wywołujemy funkcję w demona DBus. Oczekuje ona 3 parametrów (ssa{sv}): plik, pusty folder i opcje
-        transfer = await map_iface.call_push_message(path, "", {})
+        from dbus_next import Message, MessageType
+        
+        # Tworzymy RAW Message zamiast polegać na map_iface.call_push_message
+        msg = Message(destination='org.bluez.obex',
+                      path=session_path,
+                      interface='org.bluez.obex.MessageAccess1',
+                      member='PushMessage',
+                      signature='ssa{sv}',
+                      body=[path, "", {}])
+                      
+        reply = await bus.call(msg)
+        
+        if reply.message_type == MessageType.ERROR:
+            return jsonify({"error": f"BlueZ Error: {reply.error_name} - {reply.body}"}), 500
+            
+        transfer = reply.body[0] if reply.body else "unknown"
         return jsonify({"success": True, "transfer": str(transfer)})
     except Exception as e:
         return jsonify({"error": f"BlueZ Error: {str(e)}"}), 500
