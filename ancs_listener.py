@@ -89,8 +89,9 @@ async def connect_and_listen(mac_address: str | None) -> None:
         device = None
         
         if mac_address:
-            # bleak can connect directly by MAC if known by BlueZ
-            device = mac_address
+            # Bypass scanner cache by constructing BLEDevice manually
+            # This is necessary because already-connected devices might not be in the active scan cache
+            device = BLEDevice(mac_address, mac_address, {}, rssi=0)
         else:
             device = await find_apple_device()
             if not device:
@@ -115,11 +116,19 @@ async def connect_and_listen(mac_address: str | None) -> None:
                     console.print(f"[dim]Pairing request info: {e}[/]")
                 
                 # Verify ANCS service is present
-                services = client.services
-                ancs_service = services.get_service(ANCS_SERVICE_UUID)
+                # After pairing, iOS might take a few seconds to expose ANCS in the GATT table. We loop and wait.
+                ancs_service = None
+                for attempt in range(10):
+                    services = await client.get_services()
+                    ancs_service = services.get_service(ANCS_SERVICE_UUID)
+                    if ancs_service:
+                        break
+                    console.print(f"[dim]Waiting for ANCS service to appear in GATT table (attempt {attempt+1}/10)...[/]")
+                    await asyncio.sleep(2.0)
+                
                 if not ancs_service:
-                    console.print("[bold red]✘[/] ANCS Service not found on this device!")
-                    console.print("[yellow]Ensure the device is trusted and paired properly.[/]")
+                    console.print("[bold red]✘[/] ANCS Service not found on this device after 20 seconds!")
+                    console.print("[yellow]Ensure the device is trusted, and you clicked 'Allow' on iPhone.[/]")
                     return
 
                 console.print("[bold green]✔[/] ANCS Service discovered.")
