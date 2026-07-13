@@ -59,7 +59,8 @@ async def main():
         
         console.print("\n[bold magenta]--- Skrzynka odbiorcza (Ostatnie 10 wiadomości) ---[/]\n")
         
-        for msg_path, msg_props in messages:
+        # Wiadomości zwracane są jako słownik (dict: ścieżka -> właściwości), używamy .items()
+        for msg_path, msg_props in messages.items():
             subject = msg_props.get('Subject', Variant('s', '<Brak treści/Szyfrowane>')).value
             sender = msg_props.get('Sender', Variant('s', '<Nieznany>')).value
             sender_name = msg_props.get('SenderName', Variant('s', '')).value
