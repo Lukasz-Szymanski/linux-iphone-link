@@ -98,7 +98,7 @@ async def send_message():
     if not number or not text:
         return jsonify({"error": "Brak numeru lub treści"}), 400
         
-    map_iface, _, err = await get_map_session()
+    map_iface, session_path, err = await get_map_session()
     if not map_iface:
         return jsonify({"error": err or "Brak sesji MAP"}), 500
         
