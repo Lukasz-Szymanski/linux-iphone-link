@@ -33,17 +33,21 @@ async def get_map_session():
         last_error = "Nie odnaleziono sesji (sesja wygasła?)"
         try:
             session_path = await obex_client.call_create_session(MAC_ADDRESS, {"Target": Variant('s', "map")})
+            import asyncio
+            await asyncio.sleep(0.5) # Czekamy aż obexd podepnie interfejs MAP
         except Exception as e:
-            # Nie udało się utworzyć, spróbujmy odświeżyć listę
             last_error = str(e)
-            managed_objects = await obj_manager.call_get_managed_objects()
-            for path, interfaces in managed_objects.items():
-                if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
-                    props = interfaces['org.bluez.obex.Session1']
-                    dest = props.get('Destination', Variant('s', '')).value
-                    if dest.upper() == MAC_ADDRESS.upper():
-                        session_path = path
-                        break
+            
+        # Zawsze weryfikujemy czy interfejs istnieje
+        managed_objects = await obj_manager.call_get_managed_objects()
+        session_path = None # Reset i szukamy ponownie by upewnić się że ma MessageAccess1
+        for path, interfaces in managed_objects.items():
+            if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
+                props = interfaces['org.bluez.obex.Session1']
+                dest = props.get('Destination', Variant('s', '')).value
+                if dest.upper() == MAC_ADDRESS.upper():
+                    session_path = path
+                    break
                             
     if not session_path:
         return None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
