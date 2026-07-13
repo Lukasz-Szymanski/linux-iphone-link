@@ -90,8 +90,9 @@ async def connect_and_listen(mac_address: str | None) -> None:
         
         if mac_address:
             # Bypass scanner cache by constructing BLEDevice manually
-            # This is necessary because already-connected devices might not be in the active scan cache
-            device = BLEDevice(mac_address, mac_address, {}, rssi=0)
+            # In Linux (bluez), Bleak expects 'details' to contain the D-Bus path.
+            dbus_path = f"/org/bluez/hci0/dev_{mac_address.replace(':', '_').upper()}"
+            device = BLEDevice(mac_address, mac_address, {"path": dbus_path}, rssi=0)
         else:
             device = await find_apple_device()
             if not device:
