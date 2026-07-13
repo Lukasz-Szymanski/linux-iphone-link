@@ -30,10 +30,12 @@ async def get_map_session():
         introspection = await bus.introspect('org.bluez.obex', '/org/bluez/obex')
         obex_proxy = bus.get_proxy_object('org.bluez.obex', '/org/bluez/obex', introspection)
         obex_client = obex_proxy.get_interface('org.bluez.obex.Client1')
+        last_error = "Nie odnaleziono sesji (sesja wygasła?)"
         try:
             session_path = await obex_client.call_create_session(MAC_ADDRESS, {"Target": Variant('s', "map")})
         except Exception as e:
             # Nie udało się utworzyć, spróbujmy odświeżyć listę
+            last_error = str(e)
             managed_objects = await obj_manager.call_get_managed_objects()
             for path, interfaces in managed_objects.items():
                 if 'org.bluez.obex.Session1' in interfaces:
@@ -42,17 +44,17 @@ async def get_map_session():
                     if dest.upper() == MAC_ADDRESS.upper():
                         session_path = path
                         break
-            
+                            
     if not session_path:
-        return None, None
+        return None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
         
     try:
         session_intro = await bus.introspect('org.bluez.obex', session_path)
         session_proxy = bus.get_proxy_object('org.bluez.obex', session_path, session_intro)
         map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
-        return map_iface, session_path
-    except Exception:
-        return None, None
+        return map_iface, session_path, None
+    except Exception as e:
+        return None, None, f"Błąd interfejsu MAP: {e}"
 
 @app.route('/')
 def index():
@@ -60,9 +62,9 @@ def index():
 
 @app.route('/api/messages')
 async def list_messages():
-    map_iface, _ = await get_map_session()
+    map_iface, _, err = await get_map_session()
     if not map_iface:
-        return jsonify({"error": "Brak połączenia z iPhonem"}), 500
+        return jsonify({"error": err or "Brak połączenia z iPhonem"}), 500
         
     try:
         await map_iface.call_set_folder('telecom/msg/inbox')
@@ -96,9 +98,9 @@ async def send_message():
     if not number or not text:
         return jsonify({"error": "Brak numeru lub treści"}), 400
         
-    map_iface, _ = await get_map_session()
+    map_iface, _, err = await get_map_session()
     if not map_iface:
-        return jsonify({"error": "Brak sesji MAP"}), 500
+        return jsonify({"error": err or "Brak sesji MAP"}), 500
         
     # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
     bmsg_content = f"""BEGIN:BMSG
