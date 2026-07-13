@@ -67,9 +67,12 @@ def index():
 
 @app.route('/api/messages')
 async def list_messages():
-    bus, map_iface, _, err = await get_map_session()
-    if not map_iface:
-        return jsonify({"error": err or "Brak połączenia z iPhonem"}), 500
+    try:
+        bus, map_iface, _, err = await get_map_session()
+        if not map_iface:
+            return jsonify({"error": err or "Brak połączenia z iPhonem"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Błąd DBus: {str(e)}"}), 500
         
     try:
         await map_iface.call_set_folder('telecom/msg/inbox')
@@ -103,9 +106,12 @@ async def send_message():
     if not number or not text:
         return jsonify({"error": "Brak numeru lub treści"}), 400
         
-    bus, map_iface, session_path, err = await get_map_session()
-    if not session_path:
-        return jsonify({"error": err or "Brak sesji MAP"}), 500
+    try:
+        bus, map_iface, session_path, err = await get_map_session()
+        if not session_path:
+            return jsonify({"error": err or "Brak sesji MAP"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Błąd inicjalizacji DBus: {str(e)}"}), 500
         
     # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
     bmsg_content = f"""BEGIN:BMSG
