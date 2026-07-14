@@ -73,9 +73,14 @@ async def list_messages():
         proxy = bus.get_proxy_object('org.bluez.obex', session_path, intro)
         map_iface = proxy.get_interface('org.bluez.obex.MessageAccess1')
         
+        try:
+            # Try to navigate to inbox. If we are already there from a previous refresh, this will fail.
+            await map_iface.call_set_folder('telecom/msg/inbox')
+        except Exception:
+            pass # We are likely already in the inbox folder
+            
         filters = {"MaxCount": Variant('q', 20)}
-        # Fetch messages using an absolute path to bypass relative SetFolder DBus state errors
-        messages_dbus = await map_iface.call_list_messages("telecom/msg/inbox", filters)
+        messages_dbus = await map_iface.call_list_messages("", filters)
         
         results = []
         for msg_path, msg_props in messages_dbus.items():
