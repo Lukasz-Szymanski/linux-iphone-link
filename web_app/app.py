@@ -6,7 +6,7 @@ from dbus_next.aio import MessageBus
 from dbus_next import BusType, Variant, Message, MessageType
 
 app = Flask(__name__)
-# Można ustawić adres MAC poprzez zmienną środowiskową:
+# You can set the MAC address via environment variable:
 # export IPHONE_MAC="XX:XX:XX:XX:XX:XX"
 MAC_ADDRESS = os.environ.get("IPHONE_MAC", "BRAK_ADRESU_MAC")
 
@@ -74,7 +74,7 @@ async def list_messages():
         map_iface = proxy.get_interface('org.bluez.obex.MessageAccess1')
         
         filters = {"MaxCount": Variant('q', 20)}
-        # Pobieramy wiadomości podając pełną ścieżkę do skrzynki (omijamy błąd relatywnego SetFolder)
+        # Fetch messages using an absolute path to bypass relative SetFolder DBus state errors
         messages_dbus = await map_iface.call_list_messages("telecom/msg/inbox", filters)
         
         results = []
@@ -147,17 +147,17 @@ import webview
 import time
 
 def start_server():
-    # Uruchamiamy bez debug mode i reloader'a, by działało stabilnie jako desktop app
+    # Run without debug mode and reloader for stable background execution
     app.run(port=5000, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
-    # Flask startuje w tle
+    # Start Flask in the background
     thread = threading.Thread(target=start_server, daemon=True)
     thread.start()
     
     time.sleep(1)
     
-    # Odpalamy natywne okno (WebKitGTK)
+    # Launch the native desktop window (WebKitGTK)
     webview.create_window(
         'Linux iPhone Link', 
         'http://127.0.0.1:5000', 

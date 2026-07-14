@@ -244,7 +244,7 @@
                         document.getElementById('chatHeader').classList.remove('hidden');
                         document.getElementById('chatHeaderName').innerText = targetNumber;
                         
-                        // Ręczne dodanie konwersacji na górę sidebaru
+                        // Manually insert conversation at the top of the sidebar
                         const inboxList = document.getElementById('inboxList');
                         document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
                         
@@ -271,7 +271,7 @@
                         
                         inboxList.insertBefore(item, inboxList.firstChild);
                     } else {
-                        // Aktualizacja ostatniej wiadomości na sidebarze dla istniejącej konwersacji
+                        // Update the last message in the sidebar for an existing conversation
                         const activeItem = document.querySelector('.message-item.active .message-subject');
                         if (activeItem) {
                             activeItem.innerText = `Ty: ${text}`;
