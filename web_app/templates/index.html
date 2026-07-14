@@ -232,11 +232,43 @@
                     chatHistory.appendChild(errorBubble);
                 } else {
                     if (!document.getElementById('newMsgHeader').classList.contains('hidden')) {
-                        // Switch from new msg to standard chat view
                         currentActiveNumber = targetNumber;
                         document.getElementById('newMsgHeader').classList.add('hidden');
                         document.getElementById('chatHeader').classList.remove('hidden');
                         document.getElementById('chatHeaderName').innerText = targetNumber;
+                        
+                        // Ręczne dodanie konwersacji na górę sidebaru
+                        const inboxList = document.getElementById('inboxList');
+                        document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
+                        
+                        const item = document.createElement('div');
+                        item.className = 'message-item active';
+                        item.style.animation = 'popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+                        
+                        const now = new Date();
+                        const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                        
+                        item.innerHTML = `
+                            <div class="message-header">
+                                <span class="message-sender">${targetNumber}</span>
+                                <span class="message-time">${timeStr}</span>
+                            </div>
+                            <div class="message-subject">Ty: ${text}</div>
+                        `;
+                        
+                        item.onclick = () => {
+                            document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
+                            item.classList.add('active');
+                            selectConversation(targetNumber, targetNumber, text);
+                        };
+                        
+                        inboxList.insertBefore(item, inboxList.firstChild);
+                    } else {
+                        // Aktualizacja ostatniej wiadomości na sidebarze dla istniejącej konwersacji
+                        const activeItem = document.querySelector('.message-item.active .message-subject');
+                        if (activeItem) {
+                            activeItem.innerText = `Ty: ${text}`;
+                        }
                     }
                 }
             } catch (err) {
