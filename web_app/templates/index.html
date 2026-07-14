@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div id="toast-container"></div>
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
@@ -15,6 +16,15 @@
             <div class="status-indicator" id="statusBadge">
                 <div class="status-dot"></div>
                 Połączono
+            </div>
+        </div>
+        
+        <div class="sidebar-search">
+            <div class="search-wrapper">
+                <svg width="14" height="14" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input type="text" id="searchInput" class="search-input" placeholder="Szukaj..." autocomplete="off">
             </div>
         </div>
         
@@ -26,17 +36,25 @@
                 Nowa wiadomość
             </button>
             <button class="new-msg-btn" style="margin: 0; padding: 12px; aspect-ratio: 1/1; display: flex; justify-content: center; align-items: center;" onclick="fetchMessages()" title="Odśwież skrzynkę">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg id="refreshIcon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                 </svg>
             </button>
         </div>
 
         <div class="inbox-list" id="inboxList">
-            <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">
-                <div class="status-dot" style="margin: 0 auto 10px auto; width: 8px; height: 8px;"></div>
-                Pobieranie wiadomości z iPhone'a...
-            </div>
+            <div class="skeleton-item"><div class="skeleton-avatar"></div><div class="skeleton-content"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+            <div class="skeleton-item" style="opacity: 0.5;"><div class="skeleton-avatar"></div><div class="skeleton-content"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+            <div class="skeleton-item" style="opacity: 0.3;"><div class="skeleton-avatar"></div><div class="skeleton-content"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>
+        </div>
+        
+        <div class="sidebar-settings" style="padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <span style="font-size: 12px; color: var(--text-muted); font-weight: 500;">Wygląd</span>
+            <button onclick="document.body.classList.toggle('light-theme')" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 4px;" title="Przełącz motyw (Light/Dark)">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                </svg>
+            </button>
         </div>
     </aside>
 
@@ -45,6 +63,7 @@
         
         <!-- Header: Conversation info or New Message Input -->
         <div class="chat-header hidden" id="chatHeader">
+            <div class="avatar" id="chatHeaderAvatar" style="background-color: var(--accent);">#</div>
             <div class="chat-header-info">
                 <h2 id="chatHeaderName">Kontakt</h2>
                 <p id="chatHeaderSub">iMessage / SMS</p>
@@ -72,7 +91,8 @@
         <!-- Compose Area -->
         <div class="compose-area">
             <div class="compose-input-wrapper">
-                <input type="text" class="compose-input" id="messageInput" placeholder="Napisz iMessage (beta)..." disabled autocomplete="off">
+                <textarea class="compose-input" id="messageInput" placeholder="Wiadomość..." disabled rows="1"></textarea>
+                <div id="charCounter" class="char-counter hidden">0/160</div>
             </div>
             <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
                 <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-left: -2px; margin-top: 2px;">
@@ -85,15 +105,94 @@
     <script>
         let currentActiveNumber = null;
         
-        // Listen for Enter key to send
-        document.getElementById("messageInput").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('hide');
+                toast.addEventListener('animationend', () => toast.remove());
+            }, 6000); // Zwiększono czas do 6 sekund
+        }
+
+        // Setup textarea auto-resize and counter
+        const messageInput = document.getElementById("messageInput");
+        const charCounter = document.getElementById("charCounter");
+        
+        messageInput.addEventListener("input", function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value === '') this.style.height = 'auto';
+            
+            const len = this.value.length;
+            if (len > 0) {
+                charCounter.classList.remove('hidden');
+                charCounter.innerText = `${len}/160`;
+                if (len > 150) charCounter.classList.add('danger');
+                else charCounter.classList.remove('danger');
+                
+                if (len > 130 && len <= 150) charCounter.classList.add('warning');
+                else charCounter.classList.remove('warning');
+            } else {
+                charCounter.classList.add('hidden');
+            }
+        });
+
+        // Listen for Enter key to send (Shift+Enter for new line)
+        messageInput.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 document.getElementById("sendBtn").click();
             }
         });
 
+        function getInitials(name) {
+            if (!name) return "?";
+            name = name.trim();
+            if (/^[\d\+]+$/.test(name.replace(/[\s\-\(\)]/g, ''))) return "#";
+            
+            const parts = name.split(/[\s_-]+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.message-item');
+            
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                if (text.includes(term)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        function formatTimestamp(ts) {
+            if (!ts || ts.length < 15) return "";
+            const hh = ts.substring(9, 11);
+            const mm = ts.substring(11, 13);
+            return `${hh}:${mm}`;
+        }
+
+        function getAvatarColor(idStr) {
+            if (!idStr) return 'var(--accent)';
+            const colors = ['#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#ef4444', '#3b82f6', '#6366f1'];
+            let hash = 0;
+            for (let i = 0; i < idStr.length; i++) hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+            return colors[Math.abs(hash) % colors.length];
+        }
+
         async function fetchMessages() {
+            const refreshIcon = document.getElementById('refreshIcon');
+            if (refreshIcon) refreshIcon.classList.add('spin');
+            
             try {
                 const response = await fetch('/api/messages');
                 const data = await response.json();
@@ -107,56 +206,98 @@
                     document.getElementById('statusBadge').style.color = "var(--accent-warm)";
                     document.getElementById('statusBadge').style.borderColor = "rgba(244, 63, 94, 0.2)";
                     
-                    inboxList.innerHTML = `<div style="padding: 24px; color: var(--accent-warm); font-size: 13px; text-align: center;">${data.error}</div>`;
+                    inboxList.innerHTML = `<div style="padding: 24px; color: var(--text-muted); font-size: 13px; text-align: center;">Brak wiadomości</div>`;
+                    showToast(data.error, 'error');
                     return;
                 }
 
-                data.messages.forEach((msg, index) => {
+                // Grouping logic
+                const conversations = {};
+                
+                data.messages.forEach((msg) => {
+                    const sender = msg.sender_name || msg.sender || "Nieznany";
+                    if (!conversations[sender]) {
+                        conversations[sender] = {
+                            id: msg.sender || sender,
+                            name: sender,
+                            messages: [],
+                            latestTime: msg.timestamp || ""
+                        };
+                    }
+                    conversations[sender].messages.push(msg);
+                    if (msg.status === 'unread') conversations[sender].unread = true;
+                    if (msg.timestamp && msg.timestamp > conversations[sender].latestTime) {
+                        conversations[sender].latestTime = msg.timestamp;
+                    }
+                });
+                
+                const convList = Object.values(conversations).sort((a, b) => b.latestTime.localeCompare(a.latestTime));
+                
+                convList.forEach((conv, index) => {
+                    // Sort messages chronologically for chat history
+                    conv.messages.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+                    
+                    const latestMsg = conv.messages[conv.messages.length - 1];
+                    const timeStr = formatTimestamp(latestMsg.timestamp);
+                    
                     const item = document.createElement('div');
                     item.className = 'message-item';
+                    if (conv.unread) item.classList.add('unread');
                     item.style.animationDelay = `${index * 0.05}s`;
                     item.style.animation = 'popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards';
                     item.style.opacity = '0';
                     
-                    const senderDisplay = msg.sender_name || msg.sender;
-                    const date = msg.timestamp ? msg.timestamp.substring(4, 16) : '';
+                    const initials = getInitials(conv.name);
+                    const color = getAvatarColor(conv.id);
                     
                     item.innerHTML = `
-                        <div class="message-header">
-                            <span class="message-sender">${senderDisplay}</span>
-                            <span class="message-time">${date}</span>
+                        <div class="avatar" style="background-color: ${color};">${initials}</div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="message-sender">${conv.name}</span>
+                                <span class="message-time">${timeStr}</span>
+                            </div>
+                            <div class="message-subject">${latestMsg.subject}</div>
                         </div>
-                        <div class="message-subject">${msg.subject}</div>
                     `;
                     
                     item.onclick = () => {
                         document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
                         item.classList.add('active');
-                        selectConversation(senderDisplay, msg.sender, msg.subject);
+                        selectConversation(conv);
                     };
                     inboxList.appendChild(item);
                 });
                 
             } catch (error) {
                 console.error("Error fetching messages:", error);
+                showToast("Błąd komunikacji z serwerem.", "error");
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('spin');
             }
         }
         
-        function selectConversation(senderDisplay, rawNumber, subject) {
-            currentActiveNumber = rawNumber;
+        function selectConversation(conv) {
+            currentActiveNumber = conv.id;
             
             document.getElementById('newMsgHeader').classList.add('hidden');
             document.getElementById('chatHeader').classList.remove('hidden');
-            document.getElementById('chatHeaderName').innerText = senderDisplay;
+            document.getElementById('chatHeaderName').innerText = conv.name;
+            
+            const avatar = document.getElementById('chatHeaderAvatar');
+            avatar.innerText = getInitials(conv.name);
+            avatar.style.backgroundColor = getAvatarColor(conv.id);
             
             const chatHistory = document.getElementById('chatHistory');
             chatHistory.innerHTML = '';
             
-            // Render received message bubble
-            const bubble = document.createElement('div');
-            bubble.className = 'chat-bubble received';
-            bubble.innerText = subject;
-            chatHistory.appendChild(bubble);
+            conv.messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                // MAP fetch is only inbox for now, so assume received
+                bubble.className = 'chat-bubble received';
+                bubble.innerText = msg.subject;
+                chatHistory.appendChild(bubble);
+            });
             
             enableCompose();
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -212,12 +353,27 @@
             // Add sent bubble
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble sent';
-            bubble.innerText = text;
+            const spanText = document.createElement('span');
+            spanText.innerText = text;
+            bubble.appendChild(spanText);
+            
+            const statusTick = document.createElement('div');
+            statusTick.className = 'status-tick';
+            statusTick.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`;
+            bubble.appendChild(statusTick);
+            
             chatHistory.appendChild(bubble);
             
             input.value = '';
+            input.style.height = 'auto';
             input.disabled = true;
-            document.getElementById('sendBtn').disabled = true;
+            charCounter.classList.add('hidden');
+            
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            const originalBtnContent = sendBtn.innerHTML;
+            sendBtn.innerHTML = '<div class="btn-loader"></div>';
+            
             chatHistory.scrollTop = chatHistory.scrollHeight;
             
             try {
@@ -230,15 +386,17 @@
                 const result = await response.json();
                 
                 input.disabled = false;
-                document.getElementById('sendBtn').disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalBtnContent;
                 input.focus();
                 
                 if (result.error) {
-                    const errorBubble = document.createElement('div');
-                    errorBubble.className = 'chat-bubble error';
-                    errorBubble.innerText = `Błąd: ${result.error}`;
-                    chatHistory.appendChild(errorBubble);
+                    showToast(result.error, 'error');
+                    bubble.style.opacity = '0.5';
+                    bubble.title = 'Nie wysłano';
+                    statusTick.innerHTML = `<svg width="14" height="14" fill="none" stroke="#f87171" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3Z" /></svg>`;
                 } else {
+                    statusTick.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>`;
                     if (!document.getElementById('newMsgHeader').classList.contains('hidden')) {
                         currentActiveNumber = targetNumber;
                         document.getElementById('newMsgHeader').classList.add('hidden');
@@ -256,18 +414,28 @@
                         const now = new Date();
                         const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
                         
+                        const initials = getInitials(targetNumber);
+                        const color = getAvatarColor(targetNumber);
+                        
                         item.innerHTML = `
-                            <div class="message-header">
-                                <span class="message-sender">${targetNumber}</span>
-                                <span class="message-time">${timeStr}</span>
+                            <div class="avatar" style="background-color: ${color};">${initials}</div>
+                            <div class="message-content">
+                                <div class="message-header">
+                                    <span class="message-sender">${targetNumber}</span>
+                                    <span class="message-time">${timeStr}</span>
+                                </div>
+                                <div class="message-subject">Ty: ${text}</div>
                             </div>
-                            <div class="message-subject">Ty: ${text}</div>
                         `;
                         
                         item.onclick = () => {
                             document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
                             item.classList.add('active');
-                            selectConversation(targetNumber, targetNumber, text);
+                            selectConversation({
+                                id: targetNumber,
+                                name: targetNumber,
+                                messages: [{ subject: text }]
+                            });
                         };
                         
                         inboxList.insertBefore(item, inboxList.firstChild);
@@ -281,7 +449,10 @@
                 }
             } catch (err) {
                 input.disabled = false;
-                document.getElementById('sendBtn').disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalBtnContent;
+                showToast("Błąd wysyłania.", "error");
+                bubble.style.opacity = '0.5';
                 console.error(err);
             }
             
