@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from typing import Any
 
@@ -176,7 +177,7 @@ def main() -> None:
     parser.add_argument(
         "--mac",
         "-m",
-        default=None,
+        default=os.environ.get("IPHONE_MAC"),
         help="Target a specific iPhone MAC address. If omitted, auto-discovers Apple devices.",
     )
     args = parser.parse_args()

@@ -40,7 +40,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design document.
 | Phase | Module | Status |
 |-------|--------|--------|
 | 1 | Environment bootstrap & `diag_bluetooth.py` | ✅ Complete |
-| 2 | `ancs_listener.py` — raw ANCS payload capture | 🔜 Pending |
+| 2 | `ancs_listener.py` — raw ANCS payload capture | ✅ Complete |
 | 3 | ANCS parser → Linux desktop notifications | 🔜 Pending |
 | 4 | MAP integration — read/reply SMS/iMessage | 🔜 Pending |
 
