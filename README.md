@@ -42,8 +42,6 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design document.
 | 3 | ANCS parser → Linux desktop notifications | 🔜 Pending |
 | 4 | MAP integration — read/reply SMS/iMessage | 🔜 Pending |
 
-See [`ROADMAP.md`](./ROADMAP.md) for detailed milestone descriptions.
-
 ---
 
 ## Requirements
@@ -128,7 +126,6 @@ linux-iphone-link/
 ├── requirements.txt
 ├── README.md
 ├── ARCHITECTURE.md
-├── ROADMAP.md
 └── LICENSE
 ```
 

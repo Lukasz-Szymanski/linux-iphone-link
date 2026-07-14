@@ -43,3 +43,6 @@ htmlcov/
 # Project-specific
 *.log
 *.bak
+ROADMAP.md
+LEGAL_ANALYSIS.md
+
