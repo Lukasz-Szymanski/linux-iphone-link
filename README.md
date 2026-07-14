@@ -1,5 +1,7 @@
 # Linux-iPhone-Link
 
+![Linux-iPhone-Link Banner](./assets/banner.jpg)
+
 > A Linux background daemon that replicates core Windows "Phone Link" functionality for iOS devices — without any iOS-side code.
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://python.org)
