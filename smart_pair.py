@@ -28,7 +28,7 @@ def auto_pair(mac):
     # Odpalamy pod spodem bluetoothctl i wchodzimy w interakcję
     child = pexpect.spawn('bluetoothctl', encoding='utf-8')
     
-    child.expect('#', timeout=5)
+    child.expect('>', timeout=5)
     child.sendline('agent on')
     child.expect('Agent registered', timeout=5)
     child.sendline('default-agent')
@@ -71,7 +71,7 @@ def auto_pair(mac):
     if success:
         console.print("[yellow]Ustawiam status zaufania (Trust)...[/]")
         child.sendline(f'trust {mac}')
-        child.expect('#', timeout=5)
+        child.expect('>', timeout=5)
         
         console.print("[bold green]✔ Telefon w 100% zaufany i sparowany w standardzie BLE![/]")
     

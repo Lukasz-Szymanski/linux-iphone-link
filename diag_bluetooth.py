@@ -220,7 +220,13 @@ def _is_apple_device(device_props: dict[str, Any]) -> bool:
         if oui in APPLE_OUIS:
             return True
 
-    # Heuristic 4: UUID intersection
+    # Heuristic 4: ManufacturerData contains Apple's ID (0x004C / 76)
+    # This is crucial because iOS uses random BLE MACs that don't match Apple OUIs.
+    manufacturer_data = device_props.get("ManufacturerData", {})
+    if 76 in manufacturer_data or "76" in manufacturer_data:
+        return True
+
+    # Heuristic 5: UUID intersection
     device_uuids: list[str] = device_props.get("UUIDs", []) or []
     normalized_uuids = {u.lower() for u in device_uuids}
     if normalized_uuids & IOS_HINT_UUIDS:

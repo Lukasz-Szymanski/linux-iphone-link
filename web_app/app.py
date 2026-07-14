@@ -1,46 +1,26 @@
 import asyncio
+import os
+import tempfile
 from flask import Flask, render_template, jsonify, request
 from dbus_next.aio import MessageBus
-from dbus_next import BusType, Variant
+from dbus_next import BusType, Variant, Message, MessageType
 
 app = Flask(__name__)
-MAC_ADDRESS = "XX:XX:XX:XX:XX:XX"
+# Można ustawić adres MAC poprzez zmienną środowiskową:
+# export IPHONE_MAC="XX:XX:XX:XX:XX:XX"
+MAC_ADDRESS = os.environ.get("IPHONE_MAC", "BRAK_ADRESU_MAC")
 
 async def get_map_session():
-    bus = await MessageBus(bus_type=BusType.SESSION).connect()
-    
-    # Najpierw spróbujmy znaleźć istniejącą sesję MAP używając ObjectManager
-    obj_manager_intro = await bus.introspect('org.bluez.obex', '/')
-    obj_manager_proxy = bus.get_proxy_object('org.bluez.obex', '/', obj_manager_intro)
-    obj_manager = obj_manager_proxy.get_interface('org.freedesktop.DBus.ObjectManager')
-    
-    managed_objects = await obj_manager.call_get_managed_objects()
-    session_path = None
-    
-    for path, interfaces in managed_objects.items():
-        if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
-            props = interfaces['org.bluez.obex.Session1']
-            dest = props.get('Destination', Variant('s', '')).value
-            if dest.upper() == MAC_ADDRESS.upper():
-                session_path = path
-                break
-            
-    if not session_path:
-        # Jeśli nie ma, próbujemy utworzyć nową
-        introspection = await bus.introspect('org.bluez.obex', '/org/bluez/obex')
-        obex_proxy = bus.get_proxy_object('org.bluez.obex', '/org/bluez/obex', introspection)
-        obex_client = obex_proxy.get_interface('org.bluez.obex.Client1')
-        last_error = "Nie odnaleziono sesji (sesja wygasła?)"
-        try:
-            session_path = await obex_client.call_create_session(MAC_ADDRESS, {"Target": Variant('s', "map")})
-            import asyncio
-            await asyncio.sleep(0.5) # Czekamy aż obexd podepnie interfejs MAP
-        except Exception as e:
-            last_error = str(e)
-            
-        # Zawsze weryfikujemy czy interfejs istnieje
+    try:
+        bus = await MessageBus(bus_type=BusType.SESSION).connect()
+        
+        obj_manager_intro = await bus.introspect('org.bluez.obex', '/')
+        obj_manager_proxy = bus.get_proxy_object('org.bluez.obex', '/', obj_manager_intro)
+        obj_manager = obj_manager_proxy.get_interface('org.freedesktop.DBus.ObjectManager')
+        
         managed_objects = await obj_manager.call_get_managed_objects()
-        session_path = None # Reset i szukamy ponownie by upewnić się że ma MessageAccess1
+        session_path = None
+        
         for path, interfaces in managed_objects.items():
             if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
                 props = interfaces['org.bluez.obex.Session1']
@@ -48,56 +28,35 @@ async def get_map_session():
                 if dest.upper() == MAC_ADDRESS.upper():
                     session_path = path
                     break
-                            
-    if not session_path:
-        return None, None, None, f"Nie udało się połączyć z urządzeniem: {last_error}"
-        
-    try:
-        # Ręcznie pobieramy XML, by go w razie potrzeby naprawić
-        from dbus_next import Message, introspection
-        
-        reply = await bus.call(Message(
-            destination='org.bluez.obex',
-            path=session_path,
-            interface='org.freedesktop.DBus.Introspectable',
-            member='Introspect'
-        ))
-        
-        xml = reply.body[0]
-        
-        # Obejście błędu BlueZ (obexd), który potrafi "zapomnieć" wyeksportować interfejs MAP w XMLu
-        if 'org.bluez.obex.MessageAccess1' not in xml:
-            xml = xml.replace('</node>', '''
-  <interface name="org.bluez.obex.MessageAccess1">
-    <method name="SetFolder">
-      <arg name="name" type="s" direction="in"/>
-    </method>
-    <method name="ListFolders">
-      <arg name="filters" type="a{sv}" direction="in"/>
-      <arg name="content" type="aa{sv}" direction="out"/>
-    </method>
-    <method name="ListMessages">
-      <arg name="folder" type="s" direction="in"/>
-      <arg name="filter" type="a{sv}" direction="in"/>
-      <arg name="messages" type="a{oa{sv}}" direction="out"/>
-    </method>
-    <method name="UpdateInbox"></method>
-    <method name="PushMessage">
-      <arg name="file" type="s" direction="in"/>
-      <arg name="folder" type="s" direction="in"/>
-      <arg name="args" type="a{sv}" direction="in"/>
-      <arg name="transfer" type="o" direction="out"/>
-      <arg name="properties" type="a{sv}" direction="out"/>
-    </method>
-  </interface>
-</node>''')
+                
+        if not session_path:
+            introspection = await bus.introspect('org.bluez.obex', '/org/bluez/obex')
+            obex_proxy = bus.get_proxy_object('org.bluez.obex', '/org/bluez/obex', introspection)
+            obex_client = obex_proxy.get_interface('org.bluez.obex.Client1')
+            last_error = "Nie odnaleziono sesji (sesja wygasła?)"
+            try:
+                session_path = await obex_client.call_create_session(MAC_ADDRESS, {"Target": Variant('s', "map")})
+                await asyncio.sleep(0.5) 
+            except Exception as e:
+                last_error = str(e)
             
-        session_intro = introspection.Node.parse(xml)
-        session_proxy = bus.get_proxy_object('org.bluez.obex', session_path, session_intro)
-        map_iface = session_proxy.get_interface('org.bluez.obex.MessageAccess1')
-        return bus, map_iface, session_path, None
+            managed_objects = await obj_manager.call_get_managed_objects()
+            session_path = None
+            
+            for path, interfaces in managed_objects.items():
+                if 'org.bluez.obex.Session1' in interfaces and 'org.bluez.obex.MessageAccess1' in interfaces:
+                    props = interfaces['org.bluez.obex.Session1']
+                    dest = props.get('Destination', Variant('s', '')).value
+                    if dest.upper() == MAC_ADDRESS.upper():
+                        session_path = path
+                        break
+                        
+            if not session_path:
+                return None, None, f"Nie udało się połączyć z urządzeniem (brak MAP): {last_error}"
+                
+        return bus, session_path, None
     except Exception as e:
-        return bus, None, session_path, None
+        return None, None, f"Błąd inicjalizacji DBus: {str(e)}"
 
 @app.route('/')
 def index():
@@ -106,13 +65,14 @@ def index():
 @app.route('/api/messages')
 async def list_messages():
     try:
-        bus, map_iface, _, err = await get_map_session()
-        if not map_iface:
+        bus, session_path, err = await get_map_session()
+        if not session_path:
             return jsonify({"error": err or "Brak połączenia z iPhonem"}), 500
-    except Exception as e:
-        return jsonify({"error": f"Błąd DBus: {str(e)}"}), 500
+            
+        intro = await bus.introspect('org.bluez.obex', session_path)
+        proxy = bus.get_proxy_object('org.bluez.obex', session_path, intro)
+        map_iface = proxy.get_interface('org.bluez.obex.MessageAccess1')
         
-    try:
         await map_iface.call_set_folder('telecom/msg/inbox')
         filters = {"MaxCount": Variant('q', 20)}
         messages_dbus = await map_iface.call_list_messages("", filters)
@@ -132,9 +92,6 @@ async def list_messages():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-import os
-import tempfile
-
 @app.route('/api/send', methods=['POST'])
 async def send_message():
     data = request.json
@@ -143,52 +100,43 @@ async def send_message():
     
     if not number or not text:
         return jsonify({"error": "Brak numeru lub treści"}), 400
+
+    bus, session_path, err = await get_map_session()
+    if err:
+        return jsonify({"error": err}), 500
         
-    try:
-        bus, map_iface, session_path, err = await get_map_session()
-        if not session_path:
-            return jsonify({"error": err or "Brak sesji MAP"}), 500
-    except Exception as e:
-        return jsonify({"error": f"Błąd inicjalizacji DBus: {str(e)}"}), 500
-        
-    # Tworzymy plik w standardzie bMessage (vMessage) dla systemu OBEX
-    # Zgodnie ze specyfikacją MAP musi zawierać zakończenia linii \r\n
     msg_part = f"BEGIN:MSG\r\n{text}\r\nEND:MSG\r\n"
     msg_length = len(msg_part.encode('utf-8'))
     
-    bmsg_content = f"BEGIN:BMSG\r\n" \
-                   f"VERSION:1.0\r\n" \
-                   f"STATUS:UNREAD\r\n" \
-                   f"TYPE:SMS_GSM\r\n" \
-                   f"FOLDER:telecom/msg/outbox\r\n" \
-                   f"BEGIN:BENV\r\n" \
-                   f"BEGIN:VCARD\r\n" \
-                   f"VERSION:2.1\r\n" \
-                   f"TEL:{number}\r\n" \
-                   f"END:VCARD\r\n" \
-                   f"BEGIN:BBODY\r\n" \
-                   f"CHARSET:UTF-8\r\n" \
-                   f"LENGTH:{msg_length}\r\n" \
-                   f"{msg_part}" \
-                   f"END:BBODY\r\n" \
-                   f"END:BENV\r\n" \
-                   f"END:BMSG\r\n"
+    bmsg_content = f"BEGIN:BMSG\r\nVERSION:1.0\r\nSTATUS:UNREAD\r\nTYPE:SMS_GSM\r\nFOLDER:telecom/msg/outbox\r\nBEGIN:BENV\r\nBEGIN:VCARD\r\nVERSION:2.1\r\nTEL:{number}\r\nEND:VCARD\r\nBEGIN:BBODY\r\nCHARSET:UTF-8\r\nLENGTH:{msg_length}\r\n{msg_part}END:BBODY\r\nEND:BENV\r\nEND:BMSG\r\n"
     
     fd, path = tempfile.mkstemp(suffix=".bmsg")
     with os.fdopen(fd, 'w', encoding='utf-8') as f:
         f.write(bmsg_content)
         
     try:
-        if map_iface:
-            # Używamy wygenerowanego proxy z introspekcji (które samo dobiera poprawną sygnaturę)
-            transfer = await map_iface.call_push_message(path, "", {})
-            return jsonify({"success": True, "transfer": str(transfer)})
-        else:
-            return jsonify({"error": "Brak dostępu do interfejsu MAP (spróbuj odświeżyć połączenie w ustawieniach Bluetooth)"}), 500
+        # RAW DBUS MESSAGE TO AVOID ANY DBUS-NEXT INTROSPECTION TYPOS
+        msg = Message(
+            destination='org.bluez.obex',
+            path=session_path,
+            interface='org.bluez.obex.MessageAccess1',
+            member='PushMessage',
+            signature='ssa{sv}',
+            body=[path, "", {}],
+            message_type=MessageType.METHOD_CALL
+        )
+        
+        reply = await bus.call(msg)
+        
+        if reply.message_type == MessageType.ERROR:
+            if "UnknownObject" in reply.error_name or "UnknownMethod" in reply.error_name:
+                return jsonify({"error": "Błąd: Sesja z telefonem wygasła lub telefon nie zezwolił na MAP. Spróbuj odświeżyć stronę lub wejdź w Ustawienia -> Bluetooth w telefonie."}), 500
+            return jsonify({"error": f"BlueZ Error: {reply.error_name} - {reply.body}"}), 500
+            
+        return jsonify({"success": True, "transfer": str(reply.body[0])})
     except Exception as e:
-        return jsonify({"error": f"BlueZ Error: {str(e)}"}), 500
+        return jsonify({"error": f"Wewnętrzny błąd: {str(e)}"}), 500
     finally:
-        # Usuwamy plik tymczasowy po wysłaniu
         try:
             os.remove(path)
         except:

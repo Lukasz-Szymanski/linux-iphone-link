@@ -152,3 +152,9 @@ Pull requests are welcome. Please open an issue first to discuss major changes. 
 ## License
 
 [MIT](./LICENSE) © 2026 Linux-iPhone-Link contributors.
+
+---
+
+## Disclaimer
+
+*"iPhone" is a trademark of Apple Inc. This project is not affiliated with, endorsed by, or connected to Apple Inc. in any way. All trademarks are the property of their respective owners.*
