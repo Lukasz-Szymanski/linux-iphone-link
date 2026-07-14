@@ -142,5 +142,27 @@ async def send_message():
         except:
             pass
 
+import threading
+import webview
+import time
+
+def start_server():
+    # Uruchamiamy bez debug mode i reloader'a, by działało stabilnie jako desktop app
+    app.run(port=5000, debug=False, use_reloader=False)
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Flask startuje w tle
+    thread = threading.Thread(target=start_server, daemon=True)
+    thread.start()
+    
+    time.sleep(1)
+    
+    # Odpalamy natywne okno (WebKitGTK)
+    webview.create_window(
+        'Linux iPhone Link', 
+        'http://127.0.0.1:5000', 
+        width=1100, 
+        height=750, 
+        background_color='#0f172a'
+    )
+    webview.start()

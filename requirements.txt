@@ -20,6 +20,10 @@ dbus-next>=0.2.3
 # Used as a convenience layer over dbus-next for sending system notifications.
 notify2>=0.3.1
 
+# --- GUI Wrapper (Desktop App) ---
+# Used to run the web interface as a native desktop window.
+pywebview>=4.4.1
+
 # --- Logging & CLI Utilities ---
 # Structured, colorized terminal logging.
 rich>=13.7.0
