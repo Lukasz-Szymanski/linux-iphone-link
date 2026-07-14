@@ -111,30 +111,36 @@
                     return;
                 }
 
-                data.messages.forEach((msg, index) => {
+                data.conversations.forEach((conv, index) => {
                     const item = document.createElement('div');
                     item.className = 'message-item';
                     item.style.animationDelay = `${index * 0.05}s`;
                     item.style.animation = 'popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards';
                     item.style.opacity = '0';
                     
-                    const senderDisplay = msg.sender_name || msg.sender;
-                    const date = msg.timestamp ? msg.timestamp.substring(4, 16) : '';
+                    const lastMsg = conv.messages[conv.messages.length - 1];
+                    const date = lastMsg.timestamp ? lastMsg.timestamp.substring(4, 16) : '';
+                    let prefix = lastMsg.is_sent ? "Ty: " : "";
                     
                     item.innerHTML = `
                         <div class="message-header">
-                            <span class="message-sender">${senderDisplay}</span>
+                            <span class="message-sender">${conv.name}</span>
                             <span class="message-time">${date}</span>
                         </div>
-                        <div class="message-subject">${msg.subject}</div>
+                        <div class="message-subject">${prefix}${lastMsg.subject}</div>
                     `;
                     
                     item.onclick = () => {
                         document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
                         item.classList.add('active');
-                        selectConversation(senderDisplay, msg.sender, msg.subject);
+                        selectConversation(conv);
                     };
                     inboxList.appendChild(item);
+                    
+                    if (currentActiveNumber === conv.number) {
+                        item.classList.add('active');
+                        selectConversation(conv);
+                    }
                 });
                 
             } catch (error) {
@@ -142,23 +148,25 @@
             }
         }
         
-        function selectConversation(senderDisplay, rawNumber, subject) {
-            currentActiveNumber = rawNumber;
+        function selectConversation(conv) {
+            currentActiveNumber = conv.number;
             
             document.getElementById('newMsgHeader').classList.add('hidden');
             document.getElementById('chatHeader').classList.remove('hidden');
-            document.getElementById('chatHeaderName').innerText = senderDisplay;
+            document.getElementById('chatHeaderName').innerText = conv.name;
             
             const chatHistory = document.getElementById('chatHistory');
             chatHistory.innerHTML = '';
             
-            // Render received message bubble
-            const bubble = document.createElement('div');
-            bubble.className = 'chat-bubble received';
-            bubble.innerText = subject;
-            chatHistory.appendChild(bubble);
+            conv.messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                bubble.className = msg.is_sent ? 'chat-bubble sent' : 'chat-bubble received';
+                bubble.innerText = msg.subject;
+                chatHistory.appendChild(bubble);
+            });
             
             enableCompose();
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
         
         function startNewMessage() {
@@ -266,7 +274,11 @@
                         item.onclick = () => {
                             document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
                             item.classList.add('active');
-                            selectConversation(targetNumber, targetNumber, text);
+                            selectConversation({
+                                number: targetNumber,
+                                name: targetNumber,
+                                messages: [{ subject: text, is_sent: true }]
+                            });
                         };
                         
                         inboxList.insertBefore(item, inboxList.firstChild);
