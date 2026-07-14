@@ -73,9 +73,9 @@ async def list_messages():
         proxy = bus.get_proxy_object('org.bluez.obex', session_path, intro)
         map_iface = proxy.get_interface('org.bluez.obex.MessageAccess1')
         
-        await map_iface.call_set_folder('telecom/msg/inbox')
         filters = {"MaxCount": Variant('q', 20)}
-        messages_dbus = await map_iface.call_list_messages("", filters)
+        # Pobieramy wiadomości podając pełną ścieżkę do skrzynki (omijamy błąd relatywnego SetFolder)
+        messages_dbus = await map_iface.call_list_messages("telecom/msg/inbox", filters)
         
         results = []
         for msg_path, msg_props in messages_dbus.items():
