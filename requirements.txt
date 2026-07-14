@@ -23,6 +23,9 @@ notify2>=0.3.1
 # --- GUI Wrapper (Desktop App) ---
 # Used to run the web interface as a native desktop window.
 pywebview>=4.4.1
+PyQt6>=6.11.0
+PyQt6-WebEngine>=6.11.0
+qtpy>=2.4.3
 
 # --- Logging & CLI Utilities ---
 # Structured, colorized terminal logging.
