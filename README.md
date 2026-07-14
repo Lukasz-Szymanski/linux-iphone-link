@@ -133,6 +133,28 @@ linux-iphone-link/
 
 ---
 
+## Troubleshooting
+
+### "Unable to find record" / OBEX MAP Errors
+If the daemon fails to connect to the iPhone with a MAP / OBEX error, it means iOS is actively blocking message access. Follow these steps:
+
+1. **Verify MAC Address**: Ensure you've set the `IPHONE_MAC` environment variable correctly before running the application:
+   ```bash
+   export IPHONE_MAC="XX:XX:XX:XX:XX:XX"
+   ```
+2. **iPhone Bluetooth Permissions (Most Common)**: Apple disables message access for new Bluetooth pairings by default. 
+   - Open **Settings > Bluetooth** on your iPhone.
+   - Tap the **"i"** icon next to your Linux computer's name.
+   - Enable **"Show Notifications"** (Pokazuj powiadomienia).
+   - If available, enable **"Sync Contacts"** (Synchronizuj kontakty).
+   - *Tip: If it's already on, toggle it off and on again.*
+3. **Restart BlueZ OBEX Daemon**: Sometimes the local Linux OBEX service hangs. Restart it via:
+   ```bash
+   systemctl --user restart obex
+   ```
+
+---
+
 ## Security & Privacy
 
 - **No data leaves the machine.** All communication is local Bluetooth.
