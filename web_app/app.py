@@ -85,81 +85,27 @@ async def _list_messages_async():
         proxy = bus.get_proxy_object('org.bluez.obex', session_path, intro)
         map_iface = proxy.get_interface('org.bluez.obex.MessageAccess1')
         
-        # Go to root safely
-        for _ in range(4):
-            try:
-                await map_iface.call_set_folder('..')
-            except Exception:
-                pass
-                
-        # Fetch INBOX
         try:
-            await map_iface.call_set_folder('telecom')
-            await map_iface.call_set_folder('msg')
-            await map_iface.call_set_folder('inbox')
+            # Try to navigate to inbox. If we are already there from a previous refresh, this will fail.
+            await map_iface.call_set_folder('telecom/msg/inbox')
         except Exception:
-            pass
+            pass # We are likely already in the inbox folder
             
-        filters = {"MaxCount": Variant('q', 30)}
-        inbox_msgs = await map_iface.call_list_messages("", filters)
-        
-        # Fetch SENT
-        try:
-            await map_iface.call_set_folder('..')
-            await map_iface.call_set_folder('sent')
-        except Exception:
-            pass
-            
-        sent_msgs = await map_iface.call_list_messages("", filters)
+        filters = {"MaxCount": Variant('q', 20)}
+        messages_dbus = await map_iface.call_list_messages("", filters)
         
         results = []
-        for msg_path, msg_props in inbox_msgs.items():
+        for msg_path, msg_props in messages_dbus.items():
             results.append({
+                "path": msg_path,
                 "subject": msg_props.get('Subject', Variant('s', '<Szyfrowane>')).value,
                 "sender": msg_props.get('Sender', Variant('s', 'Nieznany')).value,
                 "sender_name": msg_props.get('SenderName', Variant('s', '')).value,
                 "timestamp": msg_props.get('Timestamp', Variant('s', '')).value,
-                "is_sent": False
+                "type": msg_props.get('Type', Variant('s', 'sms')).value
             })
             
-        for msg_path, msg_props in sent_msgs.items():
-            recipient = msg_props.get('Recipient', Variant('s', '')).value
-            remote_number = recipient if recipient else msg_props.get('Sender', Variant('s', 'Nieznany')).value
-            
-            results.append({
-                "subject": msg_props.get('Subject', Variant('s', '<Szyfrowane>')).value,
-                "sender": remote_number,
-                "sender_name": msg_props.get('RecipientName', Variant('s', '')).value,
-                "timestamp": msg_props.get('Timestamp', Variant('s', '')).value,
-                "is_sent": True
-            })
-            
-        # Sort all messages chronologically
-        results.sort(key=lambda x: x['timestamp'])
-        
-        # Group into conversations
-        conversations = {}
-        for msg in results:
-            number = msg['sender']
-            if number not in conversations:
-                conversations[number] = {
-                    "number": number,
-                    "name": msg['sender_name'] or number,
-                    "messages": []
-                }
-            if msg['sender_name'] and conversations[number]['name'] == number:
-                conversations[number]['name'] = msg['sender_name']
-                
-            conversations[number]['messages'].append(msg)
-            
-        # Sort conversations by latest message timestamp
-        conv_list = list(conversations.values())
-        conv_list.sort(key=lambda c: c['messages'][-1]['timestamp'] if c['messages'] else "", reverse=True)
-        
-        # Limit to the 5 most recent conversations as requested
-        conv_list = conv_list[:5]
-            
-        return jsonify({"conversations": conv_list})
+        return jsonify({"messages": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
