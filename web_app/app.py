@@ -230,8 +230,8 @@ import webview
 import time
 
 def start_server():
-    # Run without debug mode and reloader for stable background execution
-    app.run(port=5000, debug=False, use_reloader=False)
+    # Bind exclusively to localhost for local security (prevent exposing notifications on LAN)
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     # Start Flask in the background
